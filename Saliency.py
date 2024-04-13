@@ -128,34 +128,37 @@ class Saliency(ABC):
         '''
         return img.shape[0], img.shape[1]
     
-    def _attenuateBorders(self, map, bordersize):
+    def _attenuateBorders(self, map, border_size):
         '''
-        if bordersize * 2 > map.shape[0]:
-            bordersize = math.floor(map.shape[0] / 2)
-        if bordersize * 2 > map.shape[1]:
-            bordersize = math.floor(map.shape[1] / 2)
-        if bordersize < 1:
-            return map
-        
-        bs = np.array(range(0,bordersize-1), dtype = np.uint8)
-        bs = np.expand_dims(bs, 0)
-        
+        linearly attenuates a border region of borderSize
+        on all sides of the 2d data array.
+        '''
+        result = np.copy(map)
+        dsz = map.shape
+
+        if border_size * 2 > dsz[0]:
+            border_size = int(np.floor(dsz[0] / 2))
+        if border_size * 2 > dsz[1]:
+            border_size = int(np.floor(dsz[1] / 2))
+        if border_size < 1:
+            return result
+
+        bs = np.arange(1, border_size + 1)
+        coeffs = bs / (border_size + 1)
+
         # top and bottom
-        coeff = bs / (bordersize + 1)
-        coeff = np.expand_dims(coeff, 2)
-        coeff = np.repeat(coeff, map.shape[1], axis = 2)
-        map[bs, :] *= coeff
-        map[-(bs + 1), :] *= coeff
-        
+        rec = np.tile(coeffs[:, np.newaxis], (1, dsz[1]))
+        result[bs - 1, :] *= rec
+        range_ = dsz[0] - bs[::-1] + 1
+        result[range_ - 1, :] *= rec
+
         # left and right
-        coeff = bs / (bordersize + 1)
-        coeff = np.expand_dims(coeff, 2)
-        coeff = np.repeat(coeff, map.shape[0], axis = 2)
-        map[:, bs.transpose()] *= coeff.transpose()
-        map[:, -(bs + 1).transpose()] *= coeff.transpose()
-        '''
+        rec = np.tile(coeffs[np.newaxis, :], (dsz[0], 1))
+        result[:, bs - 1] *= rec
+        range_ = dsz[1] - bs[::-1] + 1
+        result[:, range_ - 1] *= rec
         
-        return map
+        return result
     
     def _makeIntensityConspicuity(self, img):
         '''
@@ -171,7 +174,7 @@ class Saliency(ABC):
         pyramid = self._gaussianSubsample(I)
         featureMaps = self._centerSorround(pyramid, pyramid)
         for map in featureMaps:
-            map = self._attenuateBorders(map,  round(max(pyramid[4].shape) / 20))
+            map = self._attenuateBorders(map,  round(max(pyramid[4].shape) / 10))
         normMaps = []
         for map in featureMaps:
             normMaps.append( self._maxNormalization(map, 10) )
@@ -205,7 +208,7 @@ class Saliency(ABC):
         pyramidGR = self._gaussianSubsample(GR)
         featureMapsRG = self._centerSorround(pyramidRG, pyramidGR)
         for map in featureMapsRG:
-            map = self._attenuateBorders(map,  round(max(pyramidRG[4].shape) / 20))
+            map = self._attenuateBorders(map,  round(max(pyramidRG[4].shape) / 10))
         normMapsRG = []
         height, width = self._getDim(pyramidRG[4])
         for map in featureMapsRG:
@@ -216,7 +219,7 @@ class Saliency(ABC):
         pyramidYB = self._gaussianSubsample(YB)
         featureMapsBY = self._centerSorround(pyramidBY, pyramidYB)
         for map in featureMapsBY:
-            map = self._attenuateBorders(map,  round(max(pyramidBY[4].shape) / 20))
+            map = self._attenuateBorders(map,  round(max(pyramidBY[4].shape) / 10))
         normMapsBY = []
         for map in featureMapsBY:
             normMapsBY.append( self._maxNormalization(map, 10) )
